@@ -27,7 +27,7 @@ resource "aws_iam_role_policy" "iam_policy_for_lambda" {
   policy = data.aws_iam_policy_document.lambda_execution.json
 }
 
-# DynamoDB
+# DynamoDB para tarjetas
 resource "aws_dynamodb_table" "card_table" {
   name         = "card-table"
   billing_mode = "PAY_PER_REQUEST"
@@ -45,25 +45,16 @@ resource "aws_dynamodb_table" "card_table" {
   }
 }
 
-# SQS Queues
-resource "aws_sqs_queue" "notification_sqs" {
-  name                       = var.sqs_notification_name
-  visibility_timeout_seconds = 30
+data "aws_sqs_queue" "card_sqs" {
+  name = "create-card-sqs"
 }
 
-resource "aws_sqs_queue" "card_dlq" {
-  name                       = var.sqs_card_dlq_name
-  visibility_timeout_seconds = 30
+data "aws_sqs_queue" "card_dlq" {
+  name = "error-create-request-card-sqs"
 }
 
-resource "aws_sqs_queue" "card_sqs" {
-  name                       = var.sqs_card_name
-  visibility_timeout_seconds = 30
-
-  redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.card_dlq.arn
-    maxReceiveCount     = 3
-  })
+data "aws_sqs_queue" "notification_sqs" {
+  name = "notification-email-sqs"
 }
 
 # Lambda
@@ -76,38 +67,37 @@ resource "aws_lambda_function" "create_request_card_lambda" {
   memory_size   = 512
   role          = aws_iam_role.iam_for_lambda.arn
 
-  # Verificación cambios en el JAR
   source_code_hash = filebase64sha256(abspath("${path.module}/../create-request-card-lambda/target/${var.file_name}"))
 
   environment {
     variables = {
-      SQS_QUEUE_URL_NOTIFICATION = aws_sqs_queue.notification_sqs.url
-      SQS_DLQ_URL                = aws_sqs_queue.card_dlq.url
+      SQS_QUEUE_URL_CARD         = data.aws_sqs_queue.card_sqs.url
+      SQS_QUEUE_URL_NOTIFICATION = data.aws_sqs_queue.notification_sqs.url
+      SQS_DLQ_URL                = data.aws_sqs_queue.card_dlq.url
     }
   }
 }
 
-# Vincular SQS con Lambda (trigger event source mapping)
+# Vincular la cola de tarjetas con la Lambda
 resource "aws_lambda_event_source_mapping" "sqs_trigger" {
-  event_source_arn = aws_sqs_queue.card_sqs.arn
+  event_source_arn = data.aws_sqs_queue.card_sqs.arn
   function_name    = aws_lambda_function.create_request_card_lambda.arn
   batch_size       = 10
 }
 
 # Outputs
 output "card_sqs_url" {
-  value = aws_sqs_queue.card_sqs.url
+  value = data.aws_sqs_queue.card_sqs.url
 }
 
 output "card_dlq_url" {
-  value = aws_sqs_queue.card_dlq.url
+  value = data.aws_sqs_queue.card_dlq.url
 }
 
 output "notification_sqs_url" {
-  value = aws_sqs_queue.notification_sqs.url
+  value = data.aws_sqs_queue.notification_sqs.url
 }
 
 output "card_table_name" {
   value = aws_dynamodb_table.card_table.name
 }
-

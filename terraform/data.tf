@@ -1,15 +1,16 @@
-# Política de confianza para Lambda
 data "aws_iam_policy_document" "assume_role" {
   statement {
     effect = "Allow"
-    actions = ["sts:AssumeRole"]
 
     principals {
       type        = "Service"
       identifiers = ["lambda.amazonaws.com"]
     }
+
+    actions = ["sts:AssumeRole"]
   }
 }
+
 
 # Policy: permisos de Lambda en DynamoDB y SQS
 data "aws_iam_policy_document" "lambda_execution" {
@@ -25,12 +26,27 @@ data "aws_iam_policy_document" "lambda_execution" {
 
   statement {
     effect = "Allow"
-    actions = ["sqs:SendMessage", "sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
+    actions = [
+      "sqs:SendMessage",
+      "sqs:ReceiveMessage",
+      "sqs:DeleteMessage",
+      "sqs:GetQueueAttributes",
+      "sqs:ChangeMessageVisibility"
+    ]
     resources = [
-      aws_sqs_queue.card_sqs.arn,
-      aws_sqs_queue.card_dlq.arn,
-      aws_sqs_queue.notification_sqs.arn
+      data.aws_sqs_queue.card_sqs.arn,
+      data.aws_sqs_queue.card_dlq.arn,
+      data.aws_sqs_queue.notification_sqs.arn
     ]
   }
-}
 
+  statement {
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents"
+    ]
+    resources = ["arn:aws:logs:*:*:*"]
+  }
+}
