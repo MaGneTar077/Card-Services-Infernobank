@@ -1,0 +1,47 @@
+# ---- Node ----
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# ---- Build / Dist ----
+dist/
+build/
+tmp/
+.esm-cache/
+.cache/
+
+# ---- TypeScript ----
+*.tsbuildinfo
+
+# ---- AWS SAM / Serverless / CDK ----
+.serverless/
+.aws-sam/
+.cdk.out/
+
+# ---- Environment variables ----
+.env
+.env.* 
+!.env.example
+
+# ---- IDEs / Editors ----
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ---- OS files ----
+.DS_Store
+Thumbs.db
+
+# ---- Terraform ----
+.terraform/
+*.tfstate
+*.tfstate.*
+*.backup
+*.backup.*
+.terraform.lock.hcl
+
+# ---- AWS Lambda ----
+lambda.zip
