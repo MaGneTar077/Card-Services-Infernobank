@@ -12,7 +12,7 @@ variable "file_name_report" {
 
 variable "stage" {
   type    = string
-  default = "dev"
+  default = "dev-report-transaction"
 }
 
 variable "region" {

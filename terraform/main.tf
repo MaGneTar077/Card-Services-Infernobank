@@ -162,8 +162,8 @@ resource "aws_lambda_permission" "apigw_lambda_card_invoke" {
   source_arn    = "${data.aws_api_gateway_rest_api.card_api.execution_arn}/*/*"
 }
 
-# Deployment (fuerza redeploy con cambios)
-resource "aws_api_gateway_deployment" "card_api_deployment" {
+# Deployment
+resource "aws_api_gateway_deployment" "card_api_deployment_report" {
   rest_api_id = data.aws_api_gateway_rest_api.card_api.id
 
   triggers = {
@@ -179,8 +179,20 @@ resource "aws_api_gateway_deployment" "card_api_deployment" {
   ]
 }
 
+# Stage exclusivo para tu endpoint de reportes
+resource "aws_api_gateway_stage" "dev_report_transaction_stage" {
+  stage_name    = "dev-report-transaction"
+  rest_api_id   = data.aws_api_gateway_rest_api.card_api.id
+  deployment_id = aws_api_gateway_deployment.card_api_deployment_report.id
+
+  tags = {
+    Environment = "dev-report-transaction"
+    Project     = "card-reports"
+  }
+}
+
 # Output
-output "card_report_api_endpoint" {
-  description = "Endpoint completo para obtener reportes de una tarjeta"
-  value       = "https://${data.aws_api_gateway_rest_api.card_api.id}.execute-api.${var.region}.amazonaws.com/${var.stage}/card/{card_id}?start=YYYY-MM-DDTHH:mm:ssZ&end=YYYY-MM-DDTHH:mm:ssZ"
+output "card_report_api_endpoint_report_stage" {
+  description = "Endpoint de reportes en el stage dev-report-transaction"
+  value       = "https://${data.aws_api_gateway_rest_api.card_api.id}.execute-api.${var.region}.amazonaws.com/dev-report-transaction/card/{card_id}?start=YYYY-MM-DDTHH:mm:ssZ&end=YYYY-MM-DDTHH:mm:ssZ"
 }
