@@ -2,9 +2,10 @@ package org.example;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
-import com.amazonaws.services.dynamodbv2.document.DynamoDB;
-import com.amazonaws.services.dynamodbv2.document.Item;
-import com.amazonaws.services.dynamodbv2.document.Table;
+import com.amazonaws.services.dynamodbv2.document.*;
+import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
+import com.amazonaws.services.dynamodbv2.document.spec.UpdateItemSpec;
+import com.amazonaws.services.dynamodbv2.document.utils.ValueMap;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
@@ -46,7 +47,14 @@ public class CardPaidCreditCardLambda implements RequestHandler<APIGatewayProxyR
             String merchant = (String) body.get("merchant");
             Double amount = Double.parseDouble(body.get("amount").toString());
 
-            Item cardItem = cardTable.getItem("cardId", cardId);
+            QuerySpec spec = new QuerySpec()
+                    .withHashKey("uuid", cardId)
+                    .withScanIndexForward(false)
+                    .withMaxResultSize(1);
+
+            ItemCollection<QueryOutcome> result = cardTable.query(spec);
+            Item cardItem = result.iterator().hasNext() ? result.iterator().next() : null;
+
             if (cardItem == null) {
                 return new APIGatewayProxyResponseEvent()
                         .withStatusCode(404)
@@ -60,21 +68,32 @@ public class CardPaidCreditCardLambda implements RequestHandler<APIGatewayProxyR
                         .withStatusCode(400)
                         .withBody("{\"error\":\"Insufficient balance\"}");
             }
-            cardTable.updateItem("cardId", cardId, "set balance = :b", new HashMap<String, Object>() {{
-                put(":b", newBalance);
-            }});
+
+            String createdAt = cardItem.getString("createdAt");
+            if (createdAt == null || createdAt.isEmpty()) {
+                createdAt = Instant.now().toString();
+                cardItem.withString("createdAt", createdAt);
+                cardTable.putItem(cardItem);
+                context.getLogger().log("Card missing createdAt, auto-fixed.");
+            }
+
+            UpdateItemSpec updateItemSpec = new UpdateItemSpec()
+                    .withPrimaryKey("uuid", cardId, "createdAt", createdAt)
+                    .withUpdateExpression("set balance = :b")
+                    .withValueMap(new ValueMap().withNumber(":b", newBalance));
+
+            cardTable.updateItem(updateItemSpec);
 
             String uuid = UUID.randomUUID().toString();
             String timestamp = Instant.now().toString();
 
             transactionTable.putItem(new Item()
-                    .withPrimaryKey("uuid", uuid)
+                    .withPrimaryKey("uuid", uuid, "createdAt", timestamp)
                     .withString("cardId", cardId)
                     .withString("merchant", merchant)
                     .withNumber("amount", amount)
                     .withString("type", "PAYMENT")
                     .withString("status", "SUCCESS")
-                    .withString("timestamp", timestamp)
             );
 
             Map<String, Object> eventPayload = new HashMap<>();
