@@ -4,7 +4,6 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -18,6 +17,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
+
 import java.net.URL;
 import java.time.Duration;
 import java.time.Instant;
@@ -31,7 +31,7 @@ public class CardGetReportLambda implements RequestHandler<APIGatewayProxyReques
     private final S3Client s3;
     private final S3Presigner presigner;
     private final SqsClient sqs;
-    private final String TRANSACTION_TABLE = System.getenv().getOrDefault("TRANSACTION_TABLE", "transaction-table");
+    private final String TRANSACTION_TABLE = System.getenv().getOrDefault("TRANSACTIONS_TABLE", "transaction-table");
     private final String REPORTS_BUCKET = System.getenv().getOrDefault("REPORTS_BUCKET", "transactions-report-bucket");
     private final String NOTIFICATION_QUEUE_URL = System.getenv().get("SQS_QUEUE_URL_NOTIFICATION");
 
@@ -46,19 +46,19 @@ public class CardGetReportLambda implements RequestHandler<APIGatewayProxyReques
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent req, Context ctx) {
         try {
             String cardId = null;
-            if (req.getPathParameters() != null) cardId = req.getPathParameters().get("card_id");
+            if (req.getPathParameters() != null) {
+                cardId = req.getPathParameters().get("card_id");
+            }
             if (cardId == null || cardId.isBlank()) {
                 return errorResponse(400, "Missing path parameter card_id");
             }
 
-            String body = req.getBody();
-            if (body == null || body.isBlank()) {
-                return errorResponse(400, "Missing request body with start and end");
+            Map<String, String> queryParams = req.getQueryStringParameters();
+            if (queryParams == null || !queryParams.containsKey("start") || !queryParams.containsKey("end")) {
+                return errorResponse(400, "Missing query parameters start or end");
             }
-            JsonNode bodyJson = objectMapper.readTree(body);
-            String start = bodyJson.has("start") ? bodyJson.get("start").asText() : null;
-            String end = bodyJson.has("end") ? bodyJson.get("end").asText() : null;
-            if (start == null || end == null) return errorResponse(400, "Missing start or end in body");
+            String start = queryParams.get("start");
+            String end = queryParams.get("end");
 
             List<Map<String, AttributeValue>> items = scanTransactions(cardId, start, end);
 
