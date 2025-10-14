@@ -15,9 +15,25 @@ const saveTransactionSchema = Joi.object({
 
 const dynamo = new DynamoService();
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
 const cardTransactionSaveHandler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
+
+   if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify({ message: "CORS preflight OK" }),
+    };
+  }
+
+
   const { card_id } = event.pathParameters || {};
   if (!card_id) {
     throw new createHttpError.BadRequest("Missing card_id in path");
@@ -50,6 +66,7 @@ const cardTransactionSaveHandler = async (
   // 4️⃣ Respuesta
   return {
     statusCode: 201,
+    headers: corsHeaders,
     body: JSON.stringify({
       message: "Balance added successfully",
       card: updatedCard,
