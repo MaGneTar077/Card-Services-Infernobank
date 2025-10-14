@@ -8,8 +8,22 @@ import { v4 as uuidv4 } from "uuid";
 const dynamoService = new DynamoService();
 const sqsService = new SQSService();
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
 const cardPurchaseHandler: APIGatewayProxyHandler = async (event) => {
   try {
+
+    if (event.httpMethod === "OPTIONS") {
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({ message: "CORS preflight OK" }),
+      };
+    }
     const body =
       typeof event.body === "string" ? JSON.parse(event.body) : event.body || {};
 
@@ -18,6 +32,7 @@ const cardPurchaseHandler: APIGatewayProxyHandler = async (event) => {
     if (!cardId || !amount || !merchant) {
       return {
         statusCode: 400,
+        headers: corsHeaders,
         body: JSON.stringify({
           message: "merchant, cardId y amount son requeridos",
         }),
@@ -29,6 +44,7 @@ const cardPurchaseHandler: APIGatewayProxyHandler = async (event) => {
     if (!card) {
       return {
         statusCode: 404,
+        headers: corsHeaders,
         body: JSON.stringify({ message: "Card not found" }),
       };
     }
@@ -38,6 +54,7 @@ const cardPurchaseHandler: APIGatewayProxyHandler = async (event) => {
       if (card.balance < amount) {
         return {
           statusCode: 400,
+          headers: corsHeaders,
           body: JSON.stringify({ message: "Insufficient balance" }),
         };
       }
@@ -47,6 +64,7 @@ const cardPurchaseHandler: APIGatewayProxyHandler = async (event) => {
       if (used + amount > card.limit) {
         return {
           statusCode: 400,
+          headers: corsHeaders,
           body: JSON.stringify({ message: "Credit limit exceeded" }),
         };
       }
@@ -71,6 +89,7 @@ const cardPurchaseHandler: APIGatewayProxyHandler = async (event) => {
 
     return {
       statusCode: 200,
+      headers: corsHeaders,
       body: JSON.stringify({
         message: "Transaction successful",
         transaction,
@@ -80,6 +99,7 @@ const cardPurchaseHandler: APIGatewayProxyHandler = async (event) => {
     console.error("❌ Error en cardPurchaseHandler:", error);
     return {
       statusCode: 500,
+      headers: corsHeaders,
       body: JSON.stringify({ message: "Internal Server Error" }),
     };
   }
